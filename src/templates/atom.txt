@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+    <generator>RSSWorker</generator>
+    <language>{{language}}</language>
+    <id>{{id}}</id>
+    <title><![CDATA[{{{title}}}]]></title>
+
+    {{#subtitle}}
+    <subtitle><![CDATA[{{{subtitle}}}]]></subtitle>
+    {{/subtitle}}
+
+    <updated>{{updated}}</updated>
+    <link href="{{link}}" />
+    <author>
+        <name><![CDATA[{{{author}}}]]></name>
+    </author>
+
+    {{#contributor}}
+    <contributor>
+        <name><![CDATA[{{{$value}}}]]></name>
+    </contributor>
+    {{/contributor}}
+
+    {{#icon}}
+    <icon>{{icon}}</icon>
+    {{/icon}}
+
+    {{#logo}}
+    <logo>{{logo}}</logo>
+    {{/logo}}
+
+    {{#item}}
+    <entry>
+        <id>{{guid}}</id>
+        <title><![CDATA[{{{title}}}]]></title>
+
+        {{#pubDate}}
+        <published>{{pubDate}}</published>
+        {{/pubDate}}
+        <updated>{{updated}}</updated>
+
+        {{#author}}
+        <author>
+            <name><![CDATA[{{{author}}}]]></name>
+        </author>
+        {{/author}}
+
+        <link href="{{link}}" />
+
+        {{#summary}}
+        <summary type="html"><![CDATA[{{{summary}}}]]></summary>
+        {{/summary}}
+
+        {{#description}}
+        <content type="html" src="{{link}}">{{description}}</content>
+        {{/description}}
+        
+
+        {{#category}}
+        <category term="{{category}}"></category>
+        {{/category}}
+
+    </entry>
+    {{/item}}
+
+</feed>
