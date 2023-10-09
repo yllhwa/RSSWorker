@@ -183,7 +183,32 @@ let getItemFromDynamicDefault = (card) => {
 	};
 };
 
+let getItemFromPaidDynamic = (card) => {
+	let pubDate = new Date().toUTCString();
+	let author = '';
+	let category = card.cardType;
+	for (let _module of card.modules) {
+		if (_module.moduleType === 'module_author') {
+			let ptimeLabelText = _module.moduleAuthor?.ptimeLabelText;
+			pubDate = getPubDate(ptimeLabelText);
+			author = _module.moduleAuthor?.author?.name;
+		}
+	}
+	return {
+		title: '充电专属动态',
+		link: `https://t.bilibili.com/${card.extend.dynIdStr}`,
+		description: '充电专属动态',
+		pubDate: pubDate,
+		guid: `https://t.bilibili.com/${card.extend.dynIdStr}`,
+		author: author,
+		category: category,
+	};
+};
+
 let getItemFromDynamic = (card) => {
+	if (card.extend.onlyFansProperty.isOnlyFans) {
+		return getItemFromPaidDynamic(card);
+	}
 	switch (card.cardType) {
 		case 'forward':
 			return getItemFromDynamicForward(card);
