@@ -15,6 +15,9 @@ app.get('/', (ctx) => {
 app.get('robots.txt', (ctx) => {
 	return ctx.text(robotsTxt);
 });
+app.get('/debug', (ctx) => {
+	return ctx.json(ctx.req.raw?.cf);
+});
 // app.use(
 // 	'/*',
 // 	basicAuth({
