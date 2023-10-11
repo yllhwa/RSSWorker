@@ -254,4 +254,8 @@ let deal = async (ctx) => {
 	return ctx.body(`${rss}`);
 };
 
-export { deal };
+let setup = (route) => {
+	route.get('/bilibili/user/dynamic/:uid', deal);
+};
+
+export default { setup };

@@ -85,4 +85,8 @@ let deal = async (ctx) => {
 	return ctx.body(renderRss2(data));
 };
 
-export { deal };
+let setup = (route) => {
+	route.get('/telegram/channel/:username', deal);
+};
+
+export default { setup };
