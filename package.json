@@ -6,7 +6,8 @@
 		"deploy": "wrangler deploy",
 		"start": "wrangler dev",
 		"dev": "wrangler dev",
-		"build": "node build.mjs"
+		"build": "node build.mjs",
+		"postinstall": "patch-package"
 	},
 	"devDependencies": {
 		"wrangler": "^3.0.0"
@@ -21,6 +22,10 @@
 		"@bufbuild/protoc-gen-es": "^1.3.1",
 		"dayjs": "^1.11.10",
 		"hono": "^3.7.2",
-		"mustache": "^4.2.0"
+		"hpack": "^1.0.0",
+		"http2": "^3.3.7",
+		"mustache": "^4.2.0",
+		"node-forge": "^1.3.1",
+		"patch-package": "^8.0.0"
 	}
 }
