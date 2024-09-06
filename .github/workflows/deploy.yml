@@ -11,7 +11,7 @@ jobs:
     timeout-minutes: 60
     name: Deploy
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - name: Build & Deploy Worker
         uses: cloudflare/wrangler-action@v3
         with:
