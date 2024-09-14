@@ -1,4 +1,5 @@
 import { renderRss2 } from '../../utils/util';
+import { substr } from 'runes2';
 
 let deal = async (ctx) => {
 	const { username } = ctx.req.param();
@@ -80,7 +81,7 @@ let deal = async (ctx) => {
 		let title = tgme_widget_message_texts[i].replace(/<br>/g, ' ');
 		title = title.replace(/<b>|<\/b>|<img.*>/g, '');
 		if (title.length > 100) {
-			title = title.slice(0, 100) + '...';
+			title = substr(title, 0, 100) + '...';
 		} else if (title.trim().length === 0) {
 			title = '无标题';
 		}
