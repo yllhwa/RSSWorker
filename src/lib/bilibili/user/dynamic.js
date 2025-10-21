@@ -35,28 +35,6 @@ let getPubDate = (ptimeLabelText) => {
 	return pubDate;
 };
 
-// let demo_items = [
-// 	{
-// 		title: 'Bilibili User Dynamic',
-// 		link: `https://space.bilibili.com/${uid}/dynamic`,
-// 		description: 'Bilibili User Dynamic233',
-// 		pubDate: new Date().toUTCString(),
-// 		guid: `https://space.bilibili.com/${uid}/dynamic`, // use link default
-// 		author: 'bilibili@bilibili.com',
-// 		category: 'video',
-// 		comments: `https://space.bilibili.com/${uid}/dynamic`,
-// 		enclosure: {
-// 			url: 'https://www.bilibili.com/favicon.ico',
-// 			type: 'image/x-icon',
-// 			length: 0,
-// 		},
-// 		source: {
-// 			title: 'Bilibili',
-// 			url: 'https://www.bilibili.com',
-// 		},
-// 	},
-// ];
-
 let getItemFromDynamicForward = (card) => {
 	// title
 	let title = '';
