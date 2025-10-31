@@ -4,9 +4,7 @@ import { NodeModulesPolyfillPlugin } from '@esbuild-plugins/node-modules-polyfil
 
 function buildWorker({ entry, out, debug, external } = {}) {
 	return esbuild.build({
-		plugins: [
-			NodeModulesPolyfillPlugin(),
-		],
+		plugins: [NodeModulesPolyfillPlugin()],
 		platform: 'browser',
 		conditions: ['worker', 'browser'],
 		entryPoints: [entry],
@@ -27,6 +25,7 @@ function buildWorker({ entry, out, debug, external } = {}) {
 			'.txt': 'text',
 		},
 		metafile: true,
+		legalComments: 'external',
 	});
 }
 

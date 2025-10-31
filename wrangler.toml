@@ -3,7 +3,7 @@ main = "src/worker.js"
 node_compat = true
 compatibility_date = "2023-09-22"
 
-[build]
-command = "npm run build"
-cwd = "dist"
-watch_dir = "dist"
+# [build]
+# command = "npm run build"
+# cwd = "dist"
+# watch_dir = "dist"
