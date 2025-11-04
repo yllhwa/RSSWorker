@@ -6,6 +6,7 @@ RSSWorker 是一个轻量级的 RSS 订阅工具，可以部署在 Cloudflare Wo
 
 - bilibili 动态 (/bilibili/user/dynamic/:uid)
 - telegram 频道 (/telegram/channel/:username)
+- weibo 用户 (/weibo/user/:uid)
 
 ## 部署
 
