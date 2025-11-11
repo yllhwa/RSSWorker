@@ -126,4 +126,8 @@ let deal = async (ctx) => {
 	return ctx.body(renderRss2(finalData));
 };
 
-export { deal };
+let setup = (route) => {
+	route.get('/weibo/user/:uid', deal);
+};
+
+export default { setup };

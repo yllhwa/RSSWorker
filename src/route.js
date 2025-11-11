@@ -1,15 +1,14 @@
 import { Hono } from 'hono';
+import bilibili_user_dynamic from './lib/bilibili/user/dynamic';
+import telegram_channel from './lib/telegram/channel';
+import weibo_user from './lib/weibo/user';
 
 const route = new Hono();
 
-let getDealFunc = (module) => {
-	return module.deal;
-};
+let plugins = [bilibili_user_dynamic, telegram_channel, weibo_user];
 
-route.get('/bilibili/user/dynamic/:uid', getDealFunc(await import('./lib/bilibili/user/dynamic')));
-// route.get('/bilibili/test', getDealFunc(await import('./lib/bilibili/user/test_grpc')));
-route.get('/telegram/channel/:username', getDealFunc(await import('./lib/telegram/channel')));
-route.get('/weibo/user/:uid', getDealFunc(await import('./lib/weibo/user')));
-route.get('/test/:username', getDealFunc(await import('./lib/tests/HTMLRewriterTest')));
+for (let plugin of plugins) {
+	plugin.setup(route);
+}
 
 export default route;
