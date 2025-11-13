@@ -14,7 +14,12 @@ RSSWorker 是一个轻量级的 RSS 订阅工具，可以部署在 Cloudflare Wo
 
 ## 开发
 
-插件应该返回的格式为：
+在 `src/lib/[网站名称]/[功能]` 参照已有的 demo 添加脚本，然后在 `src/route.js` 中添加插件即可。
+
+注意事项：
+1. Cloudflare Worker 有最大打包体积限制（免费用户 1 MB，付费用户 10 MB），所以插件需要尽量轻量化。如使用 fetch 进行请求、使用 Cloudflare Worker 提供的 HTMLRewriter 进行 HTML 解析等。
+
+模板引擎使用的格式为：
 
 ```js
 let items = [
