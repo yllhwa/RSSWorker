@@ -4,6 +4,8 @@ RSSWorker 是一个轻量级的 RSS 订阅工具，可以部署在 Cloudflare Wo
 
 ## 支持
 
+注：以下路由均在 `[域名]/rss/` 下，如 `https://example.com/rss/bilibili/user/dynamic/1`。
+
 - bilibili 动态 (/bilibili/user/dynamic/:uid)
 - telegram 频道 (/telegram/channel/:username)
 - weibo 用户 (/weibo/user/:uid)
