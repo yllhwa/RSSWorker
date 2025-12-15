@@ -22,23 +22,38 @@ let deal = async (ctx) => {
 				description += element.getAttribute('content');
 			},
 		})
-		.on('.tgme_widget_message_bubble > .tgme_widget_message_text', {
+		.on('.tgme_widget_message_bubble', {
 			element(element) {
 				tgme_widget_message_texts.push('');
 			},
+		})
+		.on('.tgme_widget_message_bubble > .tgme_widget_message_text', {
 			text(text) {
 				tgme_widget_message_texts[tgme_widget_message_texts.length - 1] += text.text;
 			},
 		})
-		.on('.tgme_widget_message_bubble > .tgme_widget_message_text > *', {
+		.on('.tgme_widget_message_bubble > .tgme_widget_message_photo_wrap', {
 			element(element) {
-				// add <br> tag
-				tgme_widget_message_texts[tgme_widget_message_texts.length - 1] += '<br>';
+				let style = element.getAttribute('style');
+				let url = style.match(/background-image:url\('(.+)'\)/)[1];
+				tgme_widget_message_texts[tgme_widget_message_texts.length - 1] += '<img src="' + url + '" />';
+			},
+		})
+		.on('.tgme_widget_message_bubble > .tgme_widget_message_text > b', {
+			element(element) {
+				// add <b> tag
+				tgme_widget_message_texts[tgme_widget_message_texts.length - 1] += '<b>';
 			},
 			text(text) {
 				if (text.lastInTextNode) {
-					tgme_widget_message_texts[tgme_widget_message_texts.length - 1] += '<br>';
+					tgme_widget_message_texts[tgme_widget_message_texts.length - 1] += '</b>';
 				}
+			},
+		})
+		.on('.tgme_widget_message_bubble > .tgme_widget_message_text > br', {
+			element(element) {
+				// add <br> tag
+				tgme_widget_message_texts[tgme_widget_message_texts.length - 1] += '<br>';
 			},
 		})
 		.on('.tgme_widget_message_date > time', {
@@ -61,7 +76,7 @@ let deal = async (ctx) => {
 		if (tgme_widget_message_texts[i] === '') {
 			continue;
 		}
-		let title = tgme_widget_message_texts[i].replace(/<br>/g, ' ');
+		let title = tgme_widget_message_texts[i].replace(/<br>|<b>|<\/b>|<img.*>/g, ' ');
 		if (title.length > 100) {
 			title = title.slice(0, 100) + '...';
 		}
