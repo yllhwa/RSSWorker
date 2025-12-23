@@ -32,11 +32,12 @@ let deal = async (ctx) => {
 				tgme_widget_message_texts[tgme_widget_message_texts.length - 1] += text.text;
 			},
 		})
-		.on('.tgme_widget_message_bubble > .tgme_widget_message_photo_wrap', {
+		.on('.tgme_widget_message_bubble .tgme_widget_message_photo_wrap', {
 			element(element) {
 				let style = element.getAttribute('style');
 				let url = style.match(/background-image:url\('(.+)'\)/)[1];
 				tgme_widget_message_texts[tgme_widget_message_texts.length - 1] += '<img src="' + url + '" />';
+				tgme_widget_message_texts[tgme_widget_message_texts.length - 1] += '<br>';
 			},
 		})
 		.on('.tgme_widget_message_bubble > .tgme_widget_message_text > b', {
@@ -76,9 +77,12 @@ let deal = async (ctx) => {
 		if (tgme_widget_message_texts[i] === '') {
 			continue;
 		}
-		let title = tgme_widget_message_texts[i].replace(/<br>|<b>|<\/b>|<img.*>/g, ' ');
+		let title = tgme_widget_message_texts[i].replace(/<br>/g, ' ');
+		title = title.replace(/<b>|<\/b>|<img.*>/g, '');
 		if (title.length > 100) {
 			title = title.slice(0, 100) + '...';
+		} else if (title.trim().length === 0) {
+			title = '无标题';
 		}
 		let item = {
 			title: title,
