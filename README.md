@@ -11,6 +11,12 @@ RSSWorker 是一个轻量级的 RSS 订阅工具，可以部署在 Cloudflare Wo
 - weibo 用户 (/weibo/user/:uid)
 - 小红书用户 (/xiaohongshu/user/:uid)
 
+> 小红书更新后不能再使用小红书号，需要使用小红书用户ID。  
+> 获取方法：  
+> 移动端：用户页面 > 右上角三个点 > 复制链接 > 获取链接中的用户ID  
+> 网页端：用户页面 > 链接中的用户ID  
+> 格式：https://www.xiaohongshu.com/user/profile/5d2aec020000000012037401
+
 ## 部署
 
 [![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/yllhwa/RSSWorker)
