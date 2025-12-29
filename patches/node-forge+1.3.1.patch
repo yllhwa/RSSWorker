@@ -1,0 +1,26 @@
+diff --git a/node_modules/node-forge/lib/tls.js b/node_modules/node-forge/lib/tls.js
+index fadfd64..c226352 100644
+--- a/node_modules/node-forge/lib/tls.js
++++ b/node_modules/node-forge/lib/tls.js
+@@ -2774,6 +2774,21 @@ tls.createClientHello = function(c) {
+     writeVector(ext, 2, snList);
+     extensions.putBuffer(ext);
+   }
++  // TODO
++  // write alpn h2
++  var alpn = forge.util.createBuffer();
++  alpn.putByte(0x00); // type alpn
++  alpn.putByte(0x10);
++  var alpn_protocal = forge.util.createBuffer();
++  alpn_protocal.putByte(0x00); // length
++  alpn_protocal.putByte(0x03); // length
++  alpn_protocal.putByte(0x02); // length
++  alpn_protocal.putByte(0x68); // h
++  alpn_protocal.putByte(0x32); // 2
++  writeVector(alpn, 2, alpn_protocal);
++  extensions.putBuffer(alpn);
++  
++
+   var extLength = extensions.length();
+   if(extLength > 0) {
+     // add extension vector length
