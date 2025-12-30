@@ -130,7 +130,7 @@ const weiboUtils = {
 
 		// drop live photo
 		const livePhotoCount = status.pics ? status.pics.filter((pic) => pic.type === 'livephotos').length : 0;
-		const pics = status.pics && status.pics.filter((pic) => pic.type !== 'livephotos');
+		const pics = status.pics && status.pics.filter((pic) => (pic.type !== 'livephotos') && (pic.type !== 'livephoto'));
 
 		// 添加微博配图
 		if (pics) {
