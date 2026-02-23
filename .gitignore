@@ -1,2 +1,8 @@
 node_modules
 dist
+.env
+.wrangler
+.github
+.vscode
+.idea
+.DS_Store
