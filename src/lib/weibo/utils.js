@@ -60,14 +60,14 @@ const weiboUtils = {
 		if (!showEmojiInDescription) {
 			htmlNewLineUnreplaced = htmlNewLineUnreplaced.replace(
 				/<span class=["']?url-icon["']?><img\s[^>]*?alt=["']?([^>]+?)["']?\s[^>]*?\/><\/span>/g,
-				'$1'
+				'$1',
 			);
 		}
 		// 去掉链接的图标，保留 a 标签链接
 		if (!showLinkIconInDescription) {
 			htmlNewLineUnreplaced = htmlNewLineUnreplaced.replace(
 				/(<a\s[^>]*>)<span class=["']?url-icon["']?><img\s[^>]*><\/span>[^<>]*?<span class=["']?surl-text["']?>([^<>]*?)<\/span><\/a>/g,
-				'$1$2</a>'
+				'$1$2</a>',
 			);
 		}
 		// 去掉乱七八糟的图标  // 不需要，上述的替换应该已经把所有的图标都替换掉了，且这条 regex 会破坏上述替换不发生时的输出
@@ -80,7 +80,7 @@ const weiboUtils = {
 
 		// 处理外部链接
 		htmlNewLineUnreplaced = htmlNewLineUnreplaced.replace(/https:\/\/weibo\.cn\/sinaurl\/.*?&u=(http.*?")/g, (match, p1) =>
-			decodeURIComponent(p1)
+			decodeURIComponent(p1),
 		);
 
 		let html = htmlNewLineUnreplaced.replace(/\n/g, '<br>');
@@ -130,7 +130,7 @@ const weiboUtils = {
 
 		// drop live photo
 		const livePhotoCount = status.pics ? status.pics.filter((pic) => pic.type === 'livephotos').length : 0;
-		const pics = status.pics && status.pics.filter((pic) => (pic.type !== 'livephotos') && (pic.type !== 'livephoto'));
+		const pics = status.pics && status.pics.filter((pic) => pic.type !== 'livephotos' && pic.type !== 'livephoto');
 
 		// 添加微博配图
 		if (pics) {
@@ -246,13 +246,14 @@ const weiboUtils = {
 
 		return { description: html, title, link, guid, author, pubDate };
 	},
-	getShowData: async (uid, bid) => {
+	getShowData: async (ctx, uid, bid) => {
 		const link = `https://m.weibo.cn/statuses/show?id=${bid}`;
 		const itemResponse = await fetch(link, {
 			headers: {
 				Referer: `https://m.weibo.cn/u/${uid}`,
 				'MWeibo-Pwa': 1,
 				'X-Requested-With': 'XMLHttpRequest',
+				Cookie: ctx.env.WEIBO_COOKIE || '',
 				'User-Agent':
 					'Mozilla/5.0 (iPhone; CPU iPhone OS 11_0 like Mac OS X) AppleWebKit/604.1.38 (KHTML, like Gecko) Version/11.0 Mobile/15A372 Safari/604.1',
 			},
@@ -325,6 +326,7 @@ const weiboUtils = {
 			const response = await fetch(link, {
 				headers: {
 					Referer: `https://card.weibo.com/article/m/show/id/${articleId}`,
+					Cookie: ctx.env.WEIBO_COOKIE || '',
 					'MWeibo-Pwa': 1,
 					'X-Requested-With': 'XMLHttpRequest',
 					'User-Agent':
@@ -383,7 +385,7 @@ const weiboUtils = {
 						element: (elem) => {
 							elem.setAttribute(
 								'style',
-								'display: table;text-align: center;margin-left: auto;margin-right: auto;clear: both;min-width: 50px;'
+								'display: table;text-align: center;margin-left: auto;margin-right: auto;clear: both;min-width: 50px;',
 							);
 						},
 					})
@@ -409,6 +411,7 @@ const weiboUtils = {
 			const response = await fetch(link, {
 				headers: {
 					Referer: `https://m.weibo.cn/detail/${id}`,
+					Cookie: ctx.env.WEIBO_COOKIE || '',
 					'MWeibo-Pwa': 1,
 					'X-Requested-With': 'XMLHttpRequest',
 					'User-Agent':
