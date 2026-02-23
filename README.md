@@ -18,6 +18,15 @@ RSSWorker 是一个轻量级的 RSS 订阅工具，可以部署在 Cloudflare Wo
 > 网页端：用户页面 > 链接中的用户ID  
 > 格式：https://www.xiaohongshu.com/user/profile/5d2aec020000000012037401
 
+> 微博更新后需要加上Cookie
+> 获取方法（参考 https://docs.rsshub.app/zh/deploy/config#%E5%BE%AE%E5%8D%9A ） ：
+> 1. 打开并登录微博
+> 2. 从个人微博主页的网址中获取uid，在`https://m.weibo.cn/api/container/getIndex?type=uid&value=`后追加uid，访问该链接
+> 2. 按下F12打开控制台，切换至Network（网络）面板
+> 3. 在该网页切换至任意关注分组，并在面板打开最先捕获到的请求 （该情形下捕获到的请求路径应包含/feed/group）
+> 4. 查看该请求的Headers（请求头）, 找到Cookie字段并复制内容
+> 5. 命令行中输入`wrangler secret put WEIBO_COOKIE`，按下回车后再将第4步中复制的Cookie字段粘贴，后按下回车
+
 ## 部署
 
 [![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/yllhwa/RSSWorker)
