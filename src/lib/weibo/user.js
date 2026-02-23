@@ -11,6 +11,10 @@ let deal = async (ctx) => {
 	const containerData = await fetch(`https://m.weibo.cn/api/container/getIndex?type=uid&value=${uid}`, {
 		headers: {
 			Referer: `https://m.weibo.cn/u/${uid}`,
+			Cookie: ctx.env.WEIBO_COOKIE || '',
+			Accept: 'application/json, text/plain, */*',
+			'User-Agent':
+				'Mozilla/5.0 (iPhone; CPU iPhone OS 11_0 like Mac OS X) AppleWebKit/604.1.38 (KHTML, like Gecko) Version/11.0 Mobile/15A372 Safari/604.1',
 			'MWeibo-Pwa': 1,
 			'X-Requested-With': 'XMLHttpRequest',
 		},
@@ -24,6 +28,10 @@ let deal = async (ctx) => {
 	const cards = await fetch(`https://m.weibo.cn/api/container/getIndex?type=uid&value=${uid}&containerid=${containerId}`, {
 		headers: {
 			Referer: `https://m.weibo.cn/u/${uid}`,
+			Cookie: ctx.env.WEIBO_COOKIE || '',
+			Accept: 'application/json, text/plain, */*',
+			'User-Agent':
+				'Mozilla/5.0 (iPhone; CPU iPhone OS 11_0 like Mac OS X) AppleWebKit/604.1.38 (KHTML, like Gecko) Version/11.0 Mobile/15A372 Safari/604.1',
 			'MWeibo-Pwa': 1,
 			'X-Requested-With': 'XMLHttpRequest',
 		},
@@ -40,7 +48,7 @@ let deal = async (ctx) => {
 				// TODO: getShowData() on demand? The API seems to return most things we need since 2022/05/21.
 				//       Need more investigation, pending for now since the current version works fine.
 				// const data = await ctx.cache.tryGet(key, () => weiboUtils.getShowData(uid, item.mblog.bid));
-				const data = await weiboUtils.getShowData(uid, item.mblog.bid);
+				const data = await weiboUtils.getShowData(ctx, uid, item.mblog.bid);
 
 				if (data && data.text) {
 					item.mblog.text = data.text;
@@ -60,7 +68,7 @@ let deal = async (ctx) => {
 					// const retweetData = await ctx.cache.tryGet(`weibo:retweeted:${retweet.user.id}:${retweet.bid}`, () =>
 					// 	weiboUtils.getShowData(retweet.user.id, retweet.bid)
 					// );
-					const retweetData = await weiboUtils.getShowData(retweet.user.id, retweet.bid);
+					const retweetData = await weiboUtils.getShowData(ctx, retweet.user.id, retweet.bid);
 					if (retweetData !== undefined && retweetData.text) {
 						item.mblog.retweeted_status.text = retweetData.text;
 					}
@@ -99,7 +107,7 @@ let deal = async (ctx) => {
 					description,
 					isPinned: item.profile_type_id?.startsWith('proweibotop'),
 				};
-			})
+			}),
 	);
 
 	// remove pinned weibo if they are too old (older than all the rest weibo)
