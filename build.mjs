@@ -33,6 +33,7 @@ let result = await buildWorker({
 	entry: './src/worker.js',
 	out: './dist/worker.js',
 	debug: false,
+	external: ['cloudflare:sockets'],
 });
 
 if (result.metafile) {
