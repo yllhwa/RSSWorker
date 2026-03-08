@@ -10,7 +10,7 @@
 		"postinstall": "patch-package"
 	},
 	"devDependencies": {
-		"wrangler": "^3.0.0"
+		"wrangler": "^3.78.10"
 	},
 	"dependencies": {
 		"@bufbuild/buf": "^1.27.0",
