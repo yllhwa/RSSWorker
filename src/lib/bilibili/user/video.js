@@ -6,14 +6,15 @@ let deal = async (ctx) => {
 	const { uid } = ctx.req.param();
 	let dynSpaceResJson = await GetDynSpace(uid);
 	let dynSpaceRes = JSON.parse(dynSpaceResJson);
+	let dynSpaceList = Array.isArray(dynSpaceRes.list) ? dynSpaceRes.list : [];
 	let items = [];
 	let globalUsername = '';
-	if (dynSpaceRes.list.length !== 0) {
-		globalUsername = dynSpaceRes.list[0].extend.origName;
+	if (dynSpaceList.length !== 0) {
+		globalUsername = dynSpaceList[0].extend.origName;
 	} else {
 		globalUsername = uid;
 	}
-	for (let card of dynSpaceRes.list) {
+	for (let card of dynSpaceList) {
 		if (card.cardType !== 'av') {
 			continue;
 		}

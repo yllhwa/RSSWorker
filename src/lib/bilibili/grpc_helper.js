@@ -5,9 +5,27 @@ import { Metadata } from './gen/bilibili/metadata/metadata_pb.js';
 import { DynSpaceReq, DynSpaceRsp } from './gen/bilibili/app/dynamic/v2/dynamic_pb.js';
 import forge from 'node-forge/lib/index.js';
 import { connect } from 'cloudflare:sockets';
+import {
+	assertGrpcStatusOk,
+	binaryStringToUint8Array,
+	concatUint8Arrays,
+	createHeaderBlockCollector,
+	createHttp2FrameParser,
+	decodeGrpcUnaryMessage,
+	encodeGrpcMessage,
+	encodeHttp2Frame,
+	extractDataPayload,
+	extractHeaderBlock,
+	normalizeHeaders,
+	toHpackDecodeInput,
+	uint8ArrayToBinaryString,
+	validateHttpStatus,
+} from './grpc_protocol.mjs';
 var HPACK = require('hpack');
 
-const BASE_URL = 'https://grpc.biliapi.net';
+const GRPC_HOST = 'grpc.biliapi.net';
+const DYN_SPACE_PATH = '/bilibili.app.dynamic.v2.Dynamic/DynSpace';
+const GRPC_TIMEOUT_MS = 10000;
 
 let U8ToBase64 = function (u8) {
 	return btoa(String.fromCharCode.apply(null, u8));
@@ -77,84 +95,122 @@ let getHeaders = (accessKey = '') => {
 	};
 };
 
-let dataToGrpc = (data) => {
-	// grpc header
-	// type(1), length(4), data
-	let message = new Uint8Array(data);
-	let length = message.length;
-	let length_bytes = new Uint8Array(4);
-	length_bytes[0] = (length >> 24) & 0xff;
-	length_bytes[1] = (length >> 16) & 0xff;
-	length_bytes[2] = (length >> 8) & 0xff;
-	length_bytes[3] = length & 0xff;
-	let data_bin = new Uint8Array(length + 5);
-	data_bin[0] = 0; // just set type to 0, it works
-	data_bin.set(length_bytes, 1);
-	data_bin.set(message, 5);
-	return data_bin;
+let buildHeadersFrame = (path, headers, hpackCodec) => {
+	let headerList = [
+		[':method', 'POST'],
+		[':scheme', 'https'],
+		[':path', path],
+		[':authority', GRPC_HOST],
+	];
+	for (let [key, value] of Object.entries(headers)) {
+		headerList.push([key, value]);
+	}
+	let headerBlock = hpackCodec.encode(headerList);
+	let priority = new Uint8Array([0x80, 0x00, 0x00, 0x00, 0xff]);
+	let payload = concatUint8Arrays([priority, headerBlock]);
+	return encodeHttp2Frame({ type: 1, flags: 0x24, streamId: 1, payload });
 };
 
-let grpcToData = (rsp_bin) => {
-	let rsp_data = new Uint8Array(rsp_bin);
-	let rsp_message = rsp_data.slice(5);
-	return rsp_message;
+let buildGrpcRequestBytes = (path, headers, body, hpackCodec) => {
+	let preface = binaryStringToUint8Array('PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n');
+	let settings = encodeHttp2Frame({
+		type: 4,
+		streamId: 0,
+		payload: new Uint8Array([
+			0x00,
+			0x01,
+			0x00,
+			0x01,
+			0x00,
+			0x00,
+			0x00,
+			0x02,
+			0x00,
+			0x00,
+			0x00,
+			0x00,
+			0x00,
+			0x04,
+			0x00,
+			0x60,
+			0x00,
+			0x00,
+			0x00,
+			0x06,
+			0x00,
+			0x04,
+			0x00,
+			0x00,
+		]),
+	});
+	let windowUpdate = encodeHttp2Frame({
+		type: 8,
+		streamId: 0,
+		payload: new Uint8Array([0x00, 0x00, 0xef, 0x00]),
+	});
+	let headersFrame = buildHeadersFrame(path, headers, hpackCodec);
+	let dataFrame = encodeHttp2Frame({ type: 0, flags: 0x01, streamId: 1, payload: body });
+	let settingsAck = encodeHttp2Frame({ type: 4, flags: 0x01, streamId: 0 });
+	return concatUint8Arrays([preface, settings, windowUpdate, headersFrame, dataFrame, settingsAck, windowUpdate]);
 };
 
-let my_fetch = async (url, options) => {
+let decodeHeaders = (hpackCodec, frame) => normalizeHeaders(hpackCodec.decode(toHpackDecodeInput(extractHeaderBlock(frame))));
+
+let requestGrpcUnary = async (path, headers, body) => {
 	var socket = connect({
-		hostname: 'grpc.biliapi.net',
+		hostname: GRPC_HOST,
 		port: 443,
 	});
 	await socket.opened;
 	const writer = socket.writable.getWriter();
 	const reader = socket.readable.getReader();
-	return new Promise(async (resolve, reject) => {
-		let all_result = '';
+	let hpackCodec = new HPACK();
+	let parser = createHttp2FrameParser();
+	let headerBlockCollector = createHeaderBlockCollector();
+	let responseHeaders = {};
+	let responseTrailers = {};
+	let dataChunks = [];
+	let settled = false;
+	let client;
 
-		// build HEADERS
-		// HEADERS length (3 bytes)
-		let headers_raw = '';
-		// length
-		headers_raw += '\x01'; // type: HEADERS
-		headers_raw += '\x24'; // flags
-		headers_raw += '\x00\x00\x00\x01';
-		headers_raw += '\x80\x00\x00\x00';
-		headers_raw += '\xff'; // weight
-		var hpack_codec = new HPACK();
-		var headers = [
-			[':method', 'POST'],
-			[':scheme', 'https'],
-			[':path', '/bilibili.app.dynamic.v2.Dynamic/DynSpace'],
-			[':authority', 'grpc.biliapi.net'],
-		];
-		for (let [key, value] of Object.entries(options.headers)) {
-			headers.push([key, value]);
-		}
-		var headers_bin = hpack_codec.encode(headers);
-		headers_raw += String.fromCharCode.apply(null, headers_bin);
-		let headers_raw_length_bytes = new Uint8Array(3);
-		headers_raw_length_bytes[0] = ((headers_bin.length + 5) >> 16) & 0xff;
-		headers_raw_length_bytes[1] = ((headers_bin.length + 5) >> 8) & 0xff;
-		headers_raw_length_bytes[2] = (headers_bin.length + 5) & 0xff;
-		let headers_raw_length_bytes_str = String.fromCharCode.apply(null, headers_raw_length_bytes);
-		headers_raw = headers_raw_length_bytes_str + headers_raw;
+	let cleanup = async () => {
+		try {
+			client?.close();
+		} catch (e) {}
+		try {
+			writer.releaseLock();
+		} catch (e) {}
+		try {
+			reader.releaseLock();
+		} catch (e) {}
+		try {
+			await socket.close();
+		} catch (e) {}
+	};
 
-		// build data
-		// DATA length (3 bytes)
-		var data_raw = '';
-		// length
-		data_raw += '\x00'; // type: DATA
-		data_raw += '\x01'; // flags
-		data_raw += '\x00\x00\x00\x01';
-		data_raw += String.fromCharCode.apply(null, options.body);
-		let data_raw_length_bytes = new Uint8Array(3);
-		data_raw_length_bytes[0] = (options.body.length >> 16) & 0xff;
-		data_raw_length_bytes[1] = (options.body.length >> 8) & 0xff;
-		data_raw_length_bytes[2] = options.body.length & 0xff;
-		let data_raw_length_bytes_str = String.fromCharCode.apply(null, data_raw_length_bytes);
-		data_raw = data_raw_length_bytes_str + data_raw;
+	return await new Promise(async (resolve, reject) => {
+		let finish = async (callback, value) => {
+			if (settled) {
+				return;
+			}
+			settled = true;
+			await cleanup();
+			callback(value);
+		};
+		let timeout = setTimeout(() => {
+			finish(reject, new Error(`gRPC request timed out after ${GRPC_TIMEOUT_MS}ms`));
+		}, GRPC_TIMEOUT_MS);
+		let fail = (error) => {
+			clearTimeout(timeout);
+			finish(reject, error);
+		};
+		let succeed = (message) => {
+			clearTimeout(timeout);
+			finish(resolve, message);
+		};
+		let requestBytes = buildGrpcRequestBytes(path, headers, body, hpackCodec);
 
-		var client = forge.tls.createConnection({
+		client = forge.tls.createConnection({
 			server: false,
 			verify: function (connection, verified, depth, certs) {
 				// skip verification
@@ -162,73 +218,75 @@ let my_fetch = async (url, options) => {
 			},
 			connected: function (connection) {
 				console.log('[tls] connected');
-				client.prepare('PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n');
-				client.prepare(
-					'\x00\x00\x18\x04\x00\x00\x00\x00\x00\x00\x01\x00\x01\x00\x00\x00\x02\x00\x00\x00\x00\x00\x04\x00`\x00\x00\x00\x06\x00\x04\x00\x00'
-				);
-				client.prepare('\x00\x00\x04\x08\x00\x00\x00\x00\x00\x00\xef\x00\x01');
-				client.prepare(headers_raw);
-				client.prepare(data_raw);
-				client.prepare(`\x00\x00\x00\x04\x01\x00\x00\x00\x00`);
-				client.prepare('\x00\x00\x04\x08\x00\x00\x00\x00\x00\x00\xef\x00\x01');
+				client.prepare(uint8ArrayToBinaryString(requestBytes));
 			},
 			tlsDataReady: async function (connection) {
-				var data = connection.tlsData.getBytes();
-				var data_buffer = new Uint8Array(data.length);
-				for (let i = 0; i < data.length; i++) {
-					data_buffer[i] = data.charCodeAt(i);
+				try {
+					await writer.write(binaryStringToUint8Array(connection.tlsData.getBytes()));
+				} catch (e) {
+					fail(e);
 				}
-				await writer.write(data_buffer);
 			},
 			dataReady: function (connection) {
 				try {
-					var data = connection.data.getBytes();
-					console.log('[tls] data received from the server: ' + data.length);
-					while (data.length > 0) {
-						// 前 3 个字节是长度
-						let length = (data[0].charCodeAt() << 16) | (data[1].charCodeAt() << 8) | data[2].charCodeAt();
-						data = data.slice(3); // length
-						let type = data[0].charCodeAt();
-						console.log('[tls] data type', type);
-						data = data.slice(1); // type
-						let flags = data[0].charCodeAt();
-						data = data.slice(1); // flags
-						data = data.slice(4); // ident
-						let real_data = data.slice(0, length);
-						data = data.slice(length);
-						if (type == 0) {
-							// DATA
-							all_result += real_data;
-							console.log('[tls] data', all_result.length);
+					let frames = parser.push(binaryStringToUint8Array(connection.data.getBytes()));
+					for (let frame of frames) {
+						console.log('[tls] data type', frame.type);
+						if (frame.type === 0) {
+							dataChunks.push(extractDataPayload(frame));
+							console.log('[tls] data', dataChunks.reduce((total, chunk) => total + chunk.length, 0));
+						} else if (frame.type === 1 || frame.type === 9) {
+							let headerBlock = headerBlockCollector.push(frame);
+							if (headerBlock !== null) {
+								let decodedHeaders = decodeHeaders(hpackCodec, { ...frame, payload: headerBlock, flags: frame.flags & ~0x28 });
+								if (frame.flags & 0x01) {
+									responseTrailers = decodedHeaders;
+								} else {
+									responseHeaders = decodedHeaders;
+									validateHttpStatus(responseHeaders);
+								}
+							}
+						} else if (frame.type === 3) {
+							fail(new Error('HTTP/2 stream reset by upstream'));
+							return;
 						}
-						if ((type == 0 || type == 1) && flags & 0x01) {
+						if ((frame.type === 0 || frame.type === 1) && frame.flags & 0x01) {
 							console.log('[tls] end of stream');
-							client.close();
-							resolve(all_result);
+							assertGrpcStatusOk(responseHeaders, responseTrailers);
+							succeed(decodeGrpcUnaryMessage(concatUint8Arrays(dataChunks)));
+							return;
 						}
 					}
 				} catch (e) {
-					console.log(e);
-					reject(e);
+					fail(e);
 				}
 			},
 			closed: function () {
 				console.log('[tls] disconnected');
+				if (!settled) {
+					fail(new Error('TLS connection closed before gRPC response completed'));
+				}
 			},
 			error: function (connection, error) {
 				console.log('[tls] error', error);
+				fail(error instanceof Error ? error : new Error(String(error)));
 			},
 		});
 		client.handshake();
-		while (true) {
-			let data = await reader.read();
-			if (data.done) {
-				break;
+		try {
+			while (!settled) {
+				let data = await reader.read();
+				if (data.done) {
+					break;
+				}
+				client.process(uint8ArrayToBinaryString(data.value));
 			}
-			let data_str = String.fromCharCode.apply(null, data.value);
-			client.process(data_str);
+			if (!settled) {
+				fail(new Error('socket closed before gRPC response completed'));
+			}
+		} catch (e) {
+			fail(e);
 		}
-		resolve(all_result);
 	});
 };
 
@@ -236,31 +294,21 @@ let GetDynSpace = async (uid, accessKey = '') => {
 	let req_bin = new DynSpaceReq({
 		hostUid: uid,
 	}).toBinary();
-	let url = BASE_URL + '/bilibili.app.dynamic.v2.Dynamic/DynSpace';
 	let headers = getHeaders(accessKey);
 	let retry_max = 3;
-	let dynSpaceRsp = new DynSpaceRsp();
 	for (let i = 0; i < retry_max; i++) {
 		try {
-			let rsp = await my_fetch(url, {
-				method: 'POST',
-				headers: headers,
-				body: dataToGrpc(req_bin),
-			});
-			// string 转为 Uint8Array
-			rsp = rsp.slice(5);
-			let rsp_bin = new Uint8Array(rsp.length);
-			for (let i = 0; i < rsp.length; i++) {
-				rsp_bin[i] = rsp.charCodeAt(i);
-			}
+			let rsp_bin = await requestGrpcUnary(DYN_SPACE_PATH, headers, encodeGrpcMessage(req_bin));
+			let dynSpaceRsp = new DynSpaceRsp();
 			dynSpaceRsp.fromBinary(rsp_bin);
-			break;
+			return dynSpaceRsp.toJsonString();
 		} catch (e) {
-			throw e;
-			// 由于 http2 不关闭连接，而我们实现的 grpc 有问题，所以重试一下
+			if (e.grpcStatus !== undefined || i === retry_max - 1) {
+				throw e;
+			}
+			console.log(`[grpc] retry ${i + 1}/${retry_max - 1}: ${e.message}`);
 		}
 	}
-	return dynSpaceRsp.toJsonString();
 };
 
 export { GetDynSpace };
