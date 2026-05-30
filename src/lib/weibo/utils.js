@@ -1,4 +1,50 @@
+const { parseDate, parseRelativeDate } = require('../../utils/parse-date');
+
 const weiboUtils = {
+	apiHeaders: {
+		'MWeibo-Pwa': 1,
+		'X-Requested-With': 'XMLHttpRequest',
+		'User-Agent':
+			'Mozilla/5.0 (iPhone; CPU iPhone OS 11_0 like Mac OS X) AppleWebKit/604.1.38 (KHTML, like Gecko) Version/11.0 Mobile/15A372 Safari/604.1',
+	},
+	resolveMblogBid: (item) => {
+		let bid = item?.mblog?.bid;
+		if (bid === '' && item.scheme) {
+			try {
+				bid = new URL(item.scheme, 'https://m.weibo.cn').searchParams.get('mblogid') || bid;
+				item.mblog.bid = bid;
+			} catch (e) {
+				// Keep the original bid when Weibo returns an unexpected scheme shape.
+			}
+		}
+		return bid;
+	},
+	filterStalePinnedItems: (items) => {
+		const pinnedItems = items.filter((item) => item.isPinned);
+		const ordinaryItems = items.filter((item) => !item.isPinned);
+		if (pinnedItems.length === 0 || ordinaryItems.length === 0) {
+			return items;
+		}
+
+		const ordinaryPostTimes = ordinaryItems.map((item) => item.pubDate?.getTime?.()).filter((time) => Number.isFinite(time));
+		if (ordinaryPostTimes.length === 0) {
+			return items;
+		}
+
+		const earliestOrdinaryPostTime = Math.min(...ordinaryPostTimes);
+		const freshPinnedItems = pinnedItems.filter((item) => item.pubDate > earliestOrdinaryPostTime);
+		return [...freshPinnedItems, ...ordinaryItems];
+	},
+	normalizeCreatedAt: (createdAt) => {
+		if (!createdAt || createdAt instanceof Date) {
+			return createdAt;
+		}
+		if (typeof createdAt !== 'string') {
+			return createdAt;
+		}
+		const parsed = parseRelativeDate(createdAt);
+		return parsed instanceof Date ? parsed : parseDate(createdAt);
+	},
 	formatTitle: (html) =>
 		html
 			.replace(/<span class=["']url-icon["']><img\s[^>]*?alt=["']?([^>]+?)["']?\s[^>]*?\/?><\/span>/g, '$1') // 表情转换
@@ -83,6 +129,12 @@ const weiboUtils = {
 			decodeURIComponent(p1),
 		);
 
+		const category = htmlNewLineUnreplaced
+			.match(/<span class=["']?surl-text["']?>#([^<>]*?)#<\/span>/g)
+			?.map((item) => item.match(/#([^#]+)#/)?.[1])
+			.filter(Boolean)
+			.join(', ');
+
 		let html = htmlNewLineUnreplaced.replace(/\n/g, '<br>');
 
 		// 添加用户名和头像
@@ -128,9 +180,9 @@ const weiboUtils = {
 			}
 		}
 
-		// drop live photo
-		const livePhotoCount = status.pics ? status.pics.filter((pic) => pic.type === 'livephotos').length : 0;
-		const pics = status.pics && status.pics.filter((pic) => pic.type !== 'livephotos' && pic.type !== 'livephoto');
+		const livePhotoTypes = ['livephoto', 'livephotos'];
+		const livePhotoCount = status.pics ? status.pics.filter((pic) => livePhotoTypes.includes(pic.type)).length : 0;
+		const pics = status.pics;
 
 		// 添加微博配图
 		if (pics) {
@@ -142,31 +194,69 @@ const weiboUtils = {
 			// 让所有配图在 description 的最前面再次出现一次，但宽高设为 0
 			let picsPrefix = '';
 			pics.forEach((item) => {
-				picsPrefix += `<img width="0" height="0" hidden="true" src="${item.large.url}">`;
+				const imageUrl = (item.large && item.large.url) || item.url;
+				if (imageUrl) {
+					picsPrefix += `<img width="0" height="0" hidden="true" src="${imageUrl}">`;
+				}
 			});
 			picsPrefixes.push(picsPrefix);
 
 			pics.forEach((item) => {
-				if (addLinkForPics) {
-					html += '<a href="' + item.large.url + '">';
+				const isLivePhoto = livePhotoTypes.includes(item.type);
+				const imageUrl = (item.large && item.large.url) || item.url;
+				const renderImage = () => {
+					if (addLinkForPics) {
+						html += '<a href="' + imageUrl + '">';
+					}
+
+					let style = '';
+					html += '<img ';
+					html += readable ? 'vspace="8" hspace="4"' : '';
+					const imageWidth = (item.large && item.large.geo && item.large.geo.width) || widthOfPics;
+					const imageHeight = (item.large && item.large.geo && item.large.geo.height) || heightOfPics;
+					if (imageWidth >= 0) {
+						html += ` width="${imageWidth}"`;
+						style += `width: ${imageWidth}px;`;
+					}
+					if (imageHeight >= 0) {
+						html += ` height="${imageHeight}"`;
+						style += `height: ${imageHeight}px;`;
+					}
+					html += ` style="${style}"` + ' src="' + imageUrl + '">';
+
+					if (addLinkForPics) {
+						html += '</a>';
+					}
+				};
+
+				if (isLivePhoto) {
+					if (item.videoSrc) {
+						let video = `<video controls="controls" poster="${imageUrl || ''}"`;
+						video += ` src="${item.videoSrc}"`;
+						video += ' style="width: 100%">';
+						video += `<p>Live Photo 无法显示，请打开<a href="${item.videoSrc}" target="_blank" rel="noopener noreferrer">视频链接</a>观看。</p>`;
+						video += '</video>';
+						html += video;
+					} else if (imageUrl) {
+						renderImage();
+					}
+					if (!item.videoSrc) {
+						const livePhotoUrl = imageUrl || item.url;
+						html += '<br><small>Live Photo';
+						if (livePhotoUrl) {
+							html += `：<a href="${livePhotoUrl}" target="_blank" rel="noopener noreferrer">${livePhotoUrl}</a>`;
+						}
+						html += '</small>';
+					}
+
+					if (!readable) {
+						html += '<br><br>';
+					}
+
+					return;
 				}
 
-				let style = '';
-				html += '<img ';
-				html += readable ? 'vspace="8" hspace="4"' : '';
-				if (widthOfPics >= 0) {
-					html += ` width="${widthOfPics}"`;
-					style += `width: ${widthOfPics}px;`;
-				}
-				if (heightOfPics >= 0) {
-					html += ` height="${heightOfPics}"`;
-					style += `height: ${heightOfPics}px;`;
-				}
-				html += ` style="${style}"` + ' src="' + item.large.url + '">';
-
-				if (addLinkForPics) {
-					html += '</a>';
-				}
+				renderImage();
 
 				if (!readable) {
 					html += '<br><br>';
@@ -244,35 +334,23 @@ const weiboUtils = {
 		const author = status.user?.screen_name;
 		const pubDate = status.created_at;
 
-		return { description: html, title, link, guid, author, pubDate };
+		return { description: html, title, link, guid, author, pubDate, category };
 	},
 	getShowData: async (ctx, uid, bid) => {
 		const link = `https://m.weibo.cn/statuses/show?id=${bid}`;
 		const itemResponse = await fetch(link, {
 			headers: {
 				Referer: `https://m.weibo.cn/u/${uid}`,
-				'MWeibo-Pwa': 1,
-				'X-Requested-With': 'XMLHttpRequest',
 				Cookie: ctx.env.WEIBO_COOKIE || '',
-				'User-Agent':
-					'Mozilla/5.0 (iPhone; CPU iPhone OS 11_0 like Mac OS X) AppleWebKit/604.1.38 (KHTML, like Gecko) Version/11.0 Mobile/15A372 Safari/604.1',
+				...weiboUtils.apiHeaders,
 			},
 		}).then((res) => res.json());
 		return itemResponse.data.data;
 	},
 	formatVideo: (itemDesc, status) => {
 		const pageInfo = status.page_info;
-		const livePhotos = status.pics && status.pics.filter((pic) => pic.type === 'livephotos' && pic.videoSrc);
 		let video = '<br clear="both" /><div style="clear: both"></div>';
 		let anyVideo = false;
-		if (livePhotos) {
-			livePhotos.forEach((livePhoto) => {
-				video += `<video controls="controls" poster="${(livePhoto.large && livePhoto.large.url) || livePhoto.url}" src="${
-					livePhoto.videoSrc
-				}" style="width: 100%"></video>`;
-				anyVideo = true;
-			});
-		}
 		if (pageInfo && pageInfo.type === 'video') {
 			const pagePic = pageInfo.page_pic;
 			const posterUrl = pagePic ? pagePic.url : '';
@@ -327,10 +405,7 @@ const weiboUtils = {
 				headers: {
 					Referer: `https://card.weibo.com/article/m/show/id/${articleId}`,
 					Cookie: ctx.env.WEIBO_COOKIE || '',
-					'MWeibo-Pwa': 1,
-					'X-Requested-With': 'XMLHttpRequest',
-					'User-Agent':
-						'Mozilla/5.0 (iPhone; CPU iPhone OS 11_0 like Mac OS X) AppleWebKit/604.1.38 (KHTML, like Gecko) Version/11.0 Mobile/15A372 Safari/604.1',
+					...weiboUtils.apiHeaders,
 				},
 			})
 				.then((res) => res.json())
@@ -412,10 +487,7 @@ const weiboUtils = {
 				headers: {
 					Referer: `https://m.weibo.cn/detail/${id}`,
 					Cookie: ctx.env.WEIBO_COOKIE || '',
-					'MWeibo-Pwa': 1,
-					'X-Requested-With': 'XMLHttpRequest',
-					'User-Agent':
-						'Mozilla/5.0 (iPhone; CPU iPhone OS 11_0 like Mac OS X) AppleWebKit/604.1.38 (KHTML, like Gecko) Version/11.0 Mobile/15A372 Safari/604.1',
+					...weiboUtils.apiHeaders,
 				},
 			})
 				.then((res) => res.json())

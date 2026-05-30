@@ -1,5 +1,4 @@
 import weiboUtils from './utils';
-import { parseDate } from '../../utils/parse-date';
 import { renderRss2 } from '../../utils/util';
 
 let deal = async (ctx) => {
@@ -13,10 +12,7 @@ let deal = async (ctx) => {
 			Referer: `https://m.weibo.cn/u/${uid}`,
 			Cookie: ctx.env.WEIBO_COOKIE || '',
 			Accept: 'application/json, text/plain, */*',
-			'User-Agent':
-				'Mozilla/5.0 (iPhone; CPU iPhone OS 11_0 like Mac OS X) AppleWebKit/604.1.38 (KHTML, like Gecko) Version/11.0 Mobile/15A372 Safari/604.1',
-			'MWeibo-Pwa': 1,
-			'X-Requested-With': 'XMLHttpRequest',
+			...weiboUtils.apiHeaders,
 		},
 	}).then((res) => res.json());
 
@@ -30,10 +26,7 @@ let deal = async (ctx) => {
 			Referer: `https://m.weibo.cn/u/${uid}`,
 			Cookie: ctx.env.WEIBO_COOKIE || '',
 			Accept: 'application/json, text/plain, */*',
-			'User-Agent':
-				'Mozilla/5.0 (iPhone; CPU iPhone OS 11_0 like Mac OS X) AppleWebKit/604.1.38 (KHTML, like Gecko) Version/11.0 Mobile/15A372 Safari/604.1',
-			'MWeibo-Pwa': 1,
-			'X-Requested-With': 'XMLHttpRequest',
+			...weiboUtils.apiHeaders,
 		},
 	})
 		.then((res) => res.json())
@@ -48,17 +41,18 @@ let deal = async (ctx) => {
 				// TODO: getShowData() on demand? The API seems to return most things we need since 2022/05/21.
 				//       Need more investigation, pending for now since the current version works fine.
 				// const data = await ctx.cache.tryGet(key, () => weiboUtils.getShowData(uid, item.mblog.bid));
-				const data = await weiboUtils.getShowData(ctx, uid, item.mblog.bid);
+				const bid = weiboUtils.resolveMblogBid(item);
+				const data = await weiboUtils.getShowData(ctx, uid, bid);
 
 				if (data && data.text) {
 					item.mblog.text = data.text;
-					item.mblog.created_at = parseDate(data.created_at);
+					item.mblog.created_at = weiboUtils.normalizeCreatedAt(data.created_at);
 					item.mblog.pics = data.pics;
 					if (item.mblog.retweeted_status && data.retweeted_status) {
 						item.mblog.retweeted_status.created_at = data.retweeted_status.created_at;
 					}
 				} else {
-					item.mblog.created_at = item.mblog.created_at;
+					item.mblog.created_at = weiboUtils.normalizeCreatedAt(item.mblog.created_at);
 				}
 
 				// 转发的长微博处理
@@ -113,15 +107,7 @@ let deal = async (ctx) => {
 	// remove pinned weibo if they are too old (older than all the rest weibo)
 	// the character of pinned weibo is `card.profile_type_id.startsWith('proweibotop')`
 	// there can be 1 or 2 (WHAT A FANTASTIC BRAIN THE PM HAS?) pinned weibo at the same time
-	const pinnedItems = resultItems.filter((item) => item.isPinned);
-	const ordinaryItems = resultItems.filter((item) => !item.isPinned);
-	if (
-		pinnedItems.length > 0 &&
-		ordinaryItems.length > 0 &&
-		Math.max(...pinnedItems.map((i) => i.pubDate).filter(Boolean)) < Math.min(...ordinaryItems.map((i) => i.pubDate).filter(Boolean))
-	) {
-		resultItems = ordinaryItems;
-	}
+	resultItems = weiboUtils.filterStalePinnedItems(resultItems);
 
 	const finalData = weiboUtils.sinaimgTvax({
 		title: `${name}的微博`,
