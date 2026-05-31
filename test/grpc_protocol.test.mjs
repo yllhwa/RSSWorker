@@ -70,7 +70,23 @@ test('header block collector waits for CONTINUATION frames before decoding', () 
 	const [continuationFrame] = parser.push(second);
 
 	assert.equal(collector.push(headersFrame), null);
-	assert.deepEqual(collector.push(continuationFrame), new Uint8Array([1, 2, 3, 4]));
+	assert.deepEqual(collector.push(continuationFrame).payload, new Uint8Array([1, 2, 3, 4]));
+});
+
+test('header block collector preserves HEADERS metadata through CONTINUATION', () => {
+	const collector = createHeaderBlockCollector();
+	const parser = createHttp2FrameParser();
+	const first = encodeHttp2Frame({ type: 1, flags: 1, streamId: 1, payload: new Uint8Array([1, 2]) });
+	const second = encodeHttp2Frame({ type: 9, flags: 4, streamId: 1, payload: new Uint8Array([3, 4]) });
+	const [headersFrame] = parser.push(first);
+	const [continuationFrame] = parser.push(second);
+
+	assert.equal(collector.push(headersFrame), null);
+	assert.deepEqual(collector.push(continuationFrame), {
+		flags: 1,
+		streamId: 1,
+		payload: new Uint8Array([1, 2, 3, 4]),
+	});
 });
 
 test('header block collectors keep concurrent streams isolated', () => {
@@ -79,8 +95,8 @@ test('header block collectors keep concurrent streams isolated', () => {
 
 	assert.equal(firstCollector.push({ type: 1, flags: 0, streamId: 1, payload: new Uint8Array([1]) }), null);
 	assert.equal(secondCollector.push({ type: 1, flags: 0, streamId: 1, payload: new Uint8Array([9]) }), null);
-	assert.deepEqual(firstCollector.push({ type: 9, flags: 4, streamId: 1, payload: new Uint8Array([2]) }), new Uint8Array([1, 2]));
-	assert.deepEqual(secondCollector.push({ type: 9, flags: 4, streamId: 1, payload: new Uint8Array([8]) }), new Uint8Array([9, 8]));
+	assert.deepEqual(firstCollector.push({ type: 9, flags: 4, streamId: 1, payload: new Uint8Array([2]) }).payload, new Uint8Array([1, 2]));
+	assert.deepEqual(secondCollector.push({ type: 9, flags: 4, streamId: 1, payload: new Uint8Array([8]) }).payload, new Uint8Array([9, 8]));
 });
 
 test('HTTP and gRPC status validation rejects malformed upstream responses', () => {

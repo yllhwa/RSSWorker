@@ -189,15 +189,21 @@ let extractHeaderBlock = (frame) => {
 
 let createHeaderBlockCollector = () => {
 	let activeHeaderBlock = null;
+	let makeHeaderBlock = (frame, payload) => ({
+		flags: frame.flags,
+		streamId: frame.streamId,
+		payload,
+	});
 	return {
 		push(frame) {
 			if (frame.type === 1) {
 				let block = extractHeaderBlock(frame);
 				if (frame.flags & HTTP2_FLAG_END_HEADERS) {
-					return block;
+					return makeHeaderBlock(frame, block);
 				}
 				activeHeaderBlock = {
 					streamId: frame.streamId,
+					flags: frame.flags,
 					chunks: [block],
 				};
 				return null;
@@ -213,8 +219,13 @@ let createHeaderBlockCollector = () => {
 				return null;
 			}
 			let block = concatUint8Arrays(activeHeaderBlock.chunks);
+			let headerBlock = {
+				flags: activeHeaderBlock.flags,
+				streamId: activeHeaderBlock.streamId,
+				payload: block,
+			};
 			activeHeaderBlock = null;
-			return block;
+			return headerBlock;
 		},
 	};
 };

@@ -238,8 +238,8 @@ let requestGrpcUnary = async (path, headers, body) => {
 						} else if (frame.type === 1 || frame.type === 9) {
 							let headerBlock = headerBlockCollector.push(frame);
 							if (headerBlock !== null) {
-								let decodedHeaders = decodeHeaders(hpackCodec, { ...frame, payload: headerBlock, flags: frame.flags & ~0x28 });
-								if (frame.flags & 0x01) {
+								let decodedHeaders = decodeHeaders(hpackCodec, { ...headerBlock, flags: headerBlock.flags & ~0x28 });
+								if (headerBlock.flags & 0x01) {
 									responseTrailers = decodedHeaders;
 								} else {
 									responseHeaders = decodedHeaders;
@@ -250,7 +250,13 @@ let requestGrpcUnary = async (path, headers, body) => {
 							fail(new Error('HTTP/2 stream reset by upstream'));
 							return;
 						}
-						if ((frame.type === 0 || frame.type === 1) && frame.flags & 0x01) {
+						if (frame.type === 0 && frame.flags & 0x01) {
+							console.log('[tls] end of stream');
+							assertGrpcStatusOk(responseHeaders, responseTrailers);
+							succeed(decodeGrpcUnaryMessage(concatUint8Arrays(dataChunks)));
+							return;
+						}
+						if ((frame.type === 1 || frame.type === 9) && responseTrailers['grpc-status'] !== undefined) {
 							console.log('[tls] end of stream');
 							assertGrpcStatusOk(responseHeaders, responseTrailers);
 							succeed(decodeGrpcUnaryMessage(concatUint8Arrays(dataChunks)));
