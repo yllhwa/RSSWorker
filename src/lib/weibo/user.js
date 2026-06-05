@@ -46,7 +46,7 @@ let deal = async (ctx) => {
 
 				if (data && data.text) {
 					item.mblog.text = data.text;
-					item.mblog.created_at = weiboUtils.normalizeCreatedAt(data.created_at);
+					item.mblog.created_at = weiboUtils.normalizeCreatedAt(item.mblog.created_at || data.created_at);
 					item.mblog.pics = data.pics;
 					if (item.mblog.retweeted_status && data.retweeted_status) {
 						item.mblog.retweeted_status.created_at = data.retweeted_status.created_at;
