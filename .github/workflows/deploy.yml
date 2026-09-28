@@ -12,6 +12,8 @@ jobs:
     name: Deploy
     steps:
       - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
       - name: Build & Deploy Worker
         uses: cloudflare/wrangler-action@v3
         with:

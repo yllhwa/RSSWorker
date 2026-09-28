@@ -2,3 +2,6 @@ name = "rss-worker"
 main = "src/worker.js"
 compatibility_date = "2026-05-23"
 compatibility_flags = ["nodejs_compat"]
+
+[browser]
+binding = "BROWSER"

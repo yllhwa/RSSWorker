@@ -16,7 +16,10 @@ RSSWorker 是一个轻量级的 RSS 订阅工具，可以部署在 Cloudflare Wo
 > 获取方法：  
 > 移动端：用户页面 > 右上角三个点 > 复制链接 > 获取链接中的用户ID  
 > 网页端：用户页面 > 链接中的用户ID  
-> 格式：https://www.xiaohongshu.com/user/profile/5d2aec020000000012037401
+> 格式：https://www.xiaohongshu.com/user/profile/5d2aec020000000012037401  
+> 近期匿名主页可能只返回用户资料而不返回笔记，建议把分享链接中的公开参数一并附加到 RSS 路由，例如：  
+> `/rss/xiaohongshu/user/:uid?xsec_token=...&xsec_source=app_share`  
+> Worker 会优先直接请求页面；拿不到笔记时使用 Cloudflare Browser Run 回退，不需要登录 Cookie。
 
 > 微博更新后需要加上Cookie
 > 获取方法（参考 https://docs.rsshub.app/zh/deploy/config#%E5%BE%AE%E5%8D%9A ） ：
